@@ -1,6 +1,8 @@
 import type { TranscriptSegment } from "@/lib/speechmatics";
 import type { VideoMeta } from "@/lib/youtube";
 import { formatDuration } from "@/lib/youtube";
+import { fetchCaptionsViaInvidious } from "@/lib/youtube-invidious";
+import { parseVttCaptions } from "@/lib/youtube-captions-parse";
 
 export function extractYouTubeVideoId(url: string): string | null {
   try {
@@ -157,28 +159,6 @@ function parseJson3Captions(body: string): TranscriptSegment[] {
   return segments;
 }
 
-function parseVttCaptions(vtt: string): TranscriptSegment[] {
-  const segments: TranscriptSegment[] = [];
-  const blocks = vtt.split(/\n\n+/);
-  const timeRe =
-    /(\d{2}):(\d{2}):(\d{2})[.,](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[.,](\d{3})/;
-
-  for (const block of blocks) {
-    const m = block.match(timeRe);
-    if (!m) continue;
-    const startTime =
-      Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(m[4]) / 1000;
-    const text = block
-      .split("\n")
-      .slice(1)
-      .join(" ")
-      .replace(/<[^>]+>/g, "")
-      .trim();
-    if (text) segments.push({ speaker: null, startTime, text });
-  }
-  return segments;
-}
-
 async function fetchCaptionSegments(track: CaptionTrack): Promise<TranscriptSegment[]> {
   const base = track.baseUrl;
   if (!base) throw new Error("No caption track URL.");
@@ -205,9 +185,43 @@ export type YouTubeCaptionsResult = {
   captionLanguage?: string;
 };
 
+async function fetchViaInvidious(videoId: string): Promise<YouTubeCaptionsResult> {
+  const { segments, languageCode } = await fetchCaptionsViaInvidious(videoId);
+  const meta: VideoMeta = {
+    title: "YouTube video",
+    channel: "YouTube",
+    duration: segments.at(-1)?.startTime ?? 0,
+    uploadDate: "",
+  };
+  return {
+    meta: { ...meta, durationLabel: formatDuration(meta.duration) },
+    segments,
+    plainText: segments.map((s) => s.text).join(" "),
+    captionLanguage: languageCode,
+  };
+}
+
 export async function fetchYouTubeCaptions(url: string): Promise<YouTubeCaptionsResult> {
   const videoId = extractYouTubeVideoId(url);
   if (!videoId) throw new Error("Could not parse YouTube video ID.");
+
+  try {
+    const inv = await fetchViaInvidious(videoId);
+    const player = await innertubePlayer(videoId).catch(() => null);
+    if (player?.videoDetails?.title) {
+      inv.meta.title = player.videoDetails.title;
+      inv.meta.channel = player.videoDetails.author ?? inv.meta.channel;
+      const d = Number(player.videoDetails.lengthSeconds ?? 0);
+      if (d > 0) {
+        inv.meta.duration = d;
+        inv.meta.durationLabel = formatDuration(d);
+      }
+      inv.meta.thumbnail = player.videoDetails.thumbnail?.thumbnails?.at(-1)?.url;
+    }
+    return inv;
+  } catch (invErr) {
+    console.warn("[captions] invidious:", invErr);
+  }
 
   const player = await innertubePlayer(videoId);
   const tracks =

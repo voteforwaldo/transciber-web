@@ -1,5 +1,6 @@
 import { submitTranscriptionJob } from "@/lib/speechmatics";
 import { segmentsToPlainText } from "@/lib/transcript";
+import { transcribeViaRemoteService } from "@/lib/remote-transcribe";
 import { downloadYouTubeAudioViaCobalt } from "@/lib/youtube-cobalt";
 import { fetchYouTubeCaptions } from "@/lib/youtube-captions";
 import { downloadYouTubeAudio, formatDuration } from "@/lib/youtube";
@@ -71,13 +72,15 @@ export async function transcribeYouTubeUrl(
   speechmaticsKey: string,
 ): Promise<TranscribeStartResponse> {
   const cobaltBase = process.env.COBALT_API_URL?.trim();
+  const remoteService = process.env.TRANSCRIBE_SERVICE_URL?.trim();
 
   if (isVercel()) {
-    try {
-      const { buffer, filename, meta } = await downloadYouTubeAudio(url);
-      return startSpeechmaticsJob(url, buffer, filename, meta, speechmaticsKey);
-    } catch (ytdlpErr) {
-      console.warn("[transcribe] yt-dlp:", ytdlpErr);
+    if (remoteService) {
+      try {
+        return await transcribeViaRemoteService(url);
+      } catch (remoteErr) {
+        console.warn("[transcribe] remote:", remoteErr);
+      }
     }
 
     try {
@@ -102,6 +105,13 @@ export async function transcribeYouTubeUrl(
       console.warn("[transcribe] captions:", capErr);
     }
 
+    try {
+      const { buffer, filename, meta } = await downloadYouTubeAudio(url);
+      return startSpeechmaticsJob(url, buffer, filename, meta, speechmaticsKey);
+    } catch (ytdlpErr) {
+      console.warn("[transcribe] yt-dlp:", ytdlpErr);
+    }
+
     if (cobaltBase) {
       try {
         const { buffer, filename, meta } = await downloadYouTubeAudioViaCobalt(
@@ -115,7 +125,9 @@ export async function transcribeYouTubeUrl(
     }
 
     throw new Error(
-      "Could not transcribe this video on Vercel. Upload an audio file, use a video with YouTube CC subtitles, or deploy on Render (Docker) for full YouTube support — see README.",
+      "This video could not be transcribed on Vercel (YouTube blocks cloud downloads). " +
+        "Try a video with subtitles/CC enabled, upload an audio file, or set TRANSCRIBE_SERVICE_URL " +
+        "to a Render Docker deploy — see DEPLOY-RENDER.md.",
     );
   }
 

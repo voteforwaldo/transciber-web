@@ -25,6 +25,19 @@ Vercel cannot download most YouTube videos (Google blocks datacenter IPs).
 
 Paste any YouTube link — it should work like `run-local.bat`.
 
+## Use Render with your Vercel site (optional)
+
+If you want to keep **https://transciber-web.vercel.app** as the main URL:
+
+1. Deploy on Render as above.
+2. In **Vercel** → Project → **Environment Variables**, add:
+
+   `TRANSCRIBE_SERVICE_URL` = `https://your-app.onrender.com` (no trailing slash)
+
+3. Redeploy Vercel.
+
+YouTube links on Vercel will be forwarded to Render for download + Speechmatics.
+
 ## Optional: custom domain
 
 Render dashboard → your service → **Settings** → **Custom Domains**.
