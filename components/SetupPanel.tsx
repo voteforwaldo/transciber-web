@@ -10,6 +10,7 @@ type SetupStatus = {
   gemini: boolean;
   hints: string[];
   isVercel?: boolean;
+  youtubeBackend?: boolean;
 };
 
 function Check({ ok, label }: { ok: boolean; label: string }) {
@@ -66,11 +67,15 @@ export default function SetupPanel({ onReady }: { onReady?: () => void }) {
     [refresh],
   );
 
-  if (!status || status.ready) return null;
+  if (!status) return null;
 
-  return (
-    <section className="card setup-panel">
-      <h2 className="section-title">Setup required</h2>
+  const showYoutubeBackend =
+    status.isVercel && status.ready && status.youtubeBackend === false;
+
+  if (!status.ready && !showYoutubeBackend) {
+    return (
+      <section className="card setup-panel">
+        <h2 className="section-title">Setup required</h2>
       <p className="hint">Complete these before transcribing:</p>
       <ul className="setup-checks">
         <Check ok={status.speechmatics} label="Speechmatics API key" />
@@ -126,6 +131,33 @@ export default function SetupPanel({ onReady }: { onReady?: () => void }) {
           ))}
         </ul>
       ) : null}
-    </section>
-  );
+      </section>
+    );
+  }
+
+  if (showYoutubeBackend) {
+    return (
+      <section className="card setup-panel">
+        <h2 className="section-title">Enable YouTube links (one-time)</h2>
+        <p className="hint">
+          Vercel cannot download most YouTube videos directly. Connect a free Render server
+          (same app, ~10 min) so paste-link works for any video.
+        </p>
+        <p className="hint">
+          <a
+            href="https://render.com/deploy?repo=https://github.com/voteforwaldo/transciber-web"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Deploy on Render
+          </a>
+          {" · "}
+          then run <code>setup-online.bat</code> on your PC and paste your Render URL.
+        </p>
+        <p className="hint">Until then: upload an mp3/m4a file, or use videos with CC subtitles.</p>
+      </section>
+    );
+  }
+
+  return null;
 }

@@ -16,6 +16,8 @@ export type SetupStatus = {
   gemini: boolean;
   hints: string[];
   isVercel: boolean;
+  /** Render (or other) backend for full YouTube paste-link on Vercel */
+  youtubeBackend: boolean;
 };
 
 export { resetCookieCache };
@@ -45,6 +47,16 @@ export async function getSetupStatus(): Promise<SetupStatus> {
     );
   }
 
+  const isVercel = process.env.VERCEL === "1";
+  const youtubeBackend =
+    !isVercel || Boolean(process.env.TRANSCRIBE_SERVICE_URL?.trim());
+
+  if (isVercel && !youtubeBackend) {
+    hints.push(
+      "YouTube paste-link on Vercel needs Render: run setup-online.bat or set TRANSCRIBE_SERVICE_URL (see DEPLOY-RENDER.md). Upload audio still works.",
+    );
+  }
+
   const ready = cookies && ytdlp && speechmatics && gemini;
   return {
     ready,
@@ -53,7 +65,8 @@ export async function getSetupStatus(): Promise<SetupStatus> {
     speechmatics,
     gemini,
     hints,
-    isVercel: process.env.VERCEL === "1",
+    isVercel,
+    youtubeBackend,
   };
 }
 
