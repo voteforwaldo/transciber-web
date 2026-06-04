@@ -75,12 +75,11 @@ async function smFetch(
   return res;
 }
 
-export async function transcribeAudio(
+export async function submitTranscriptionJob(
   audio: Buffer,
   filename: string,
   apiKey: string,
-  onStatus?: (msg: string) => void,
-): Promise<{ segments: TranscriptSegment[]; language?: string }> {
+): Promise<string> {
   const config = {
     type: "transcription",
     transcription_config: {
@@ -96,7 +95,6 @@ export async function transcribeAudio(
   form.append("config", JSON.stringify(config));
   form.append("data_file", new Blob([new Uint8Array(audio)]), filename);
 
-  onStatus?.("Uploading audio to Speechmatics…");
   const submitRes = await smFetch("/jobs", apiKey, { method: "POST", body: form });
   if (!submitRes.ok) {
     const err = await submitRes.text();
@@ -106,35 +104,44 @@ export async function transcribeAudio(
   const submitJson = (await submitRes.json()) as { id?: string };
   const jobId = submitJson.id;
   if (!jobId) throw new Error("Speechmatics did not return a job id.");
+  return jobId;
+}
 
-  onStatus?.("Transcribing…");
-  const pollInterval = 5000;
-  let polls = 0;
-
-  while (true) {
-    await new Promise((r) => setTimeout(r, pollInterval));
-    polls += 1;
-    const infoRes = await smFetch(`/jobs/${jobId}`, apiKey);
-    if (!infoRes.ok) {
-      throw new Error(`Speechmatics job poll failed (${infoRes.status})`);
+export type SpeechmaticsJobPoll =
+  | { status: "running"; speechmaticsStatus: string }
+  | {
+      status: "done";
+      segments: TranscriptSegment[];
+      language?: string;
     }
-    const info = (await infoRes.json()) as {
-      job?: { status?: string };
-      status?: string;
-      errors?: unknown;
+  | { status: "rejected"; error: string };
+
+export async function pollTranscriptionJob(
+  jobId: string,
+  apiKey: string,
+): Promise<SpeechmaticsJobPoll> {
+  const infoRes = await smFetch(`/jobs/${jobId}`, apiKey);
+  if (!infoRes.ok) {
+    throw new Error(`Speechmatics job poll failed (${infoRes.status})`);
+  }
+  const info = (await infoRes.json()) as {
+    job?: { status?: string };
+    status?: string;
+    errors?: unknown;
+  };
+  const smStatus = info.job?.status ?? info.status ?? "unknown";
+
+  if (smStatus === "rejected") {
+    return {
+      status: "rejected",
+      error: `Speechmatics rejected the job: ${JSON.stringify(info.errors ?? info)}`,
     };
-    const status = info.job?.status ?? info.status ?? "unknown";
-    onStatus?.(`Processing… (${status}, poll ${polls})`);
-
-    if (status === "done") break;
-    if (status === "rejected") {
-      throw new Error(
-        `Speechmatics rejected the job: ${JSON.stringify(info.errors ?? info)}`,
-      );
-    }
   }
 
-  onStatus?.("Downloading transcript…");
+  if (smStatus !== "done") {
+    return { status: "running", speechmaticsStatus: smStatus };
+  }
+
   const txRes = await smFetch(
     `/jobs/${jobId}/transcript?format=json-v2`,
     apiKey,
@@ -156,6 +163,34 @@ export async function transcribeAudio(
     tx.metadata?.language_pack_info?.language_description ??
     tx.metadata?.transcription_config?.language;
 
-  const segments = buildSegments(tx.results ?? []);
-  return { segments, language: language || undefined };
+  return {
+    status: "done",
+    segments: buildSegments(tx.results ?? []),
+    language: language || undefined,
+  };
+}
+
+/** Local / single-request flow (not used on Vercel). */
+export async function transcribeAudio(
+  audio: Buffer,
+  filename: string,
+  apiKey: string,
+  onStatus?: (msg: string) => void,
+): Promise<{ segments: TranscriptSegment[]; language?: string }> {
+  onStatus?.("Uploading audio to Speechmatics…");
+  const jobId = await submitTranscriptionJob(audio, filename, apiKey);
+
+  onStatus?.("Transcribing…");
+  let polls = 0;
+  while (true) {
+    await new Promise((r) => setTimeout(r, 5000));
+    polls += 1;
+    const result = await pollTranscriptionJob(jobId, apiKey);
+    if (result.status === "running") {
+      onStatus?.(`Processing… (${result.speechmaticsStatus}, poll ${polls})`);
+      continue;
+    }
+    if (result.status === "rejected") throw new Error(result.error);
+    return { segments: result.segments, language: result.language };
+  }
 }

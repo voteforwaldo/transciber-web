@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transcribeAudio } from "@/lib/speechmatics";
-import { segmentsToPlainText } from "@/lib/transcript";
-import {
-  downloadYouTubeAudio,
-  formatDuration,
-  isYouTubeUrl,
-} from "@/lib/youtube";
+import { transcribeYouTubeUrl } from "@/lib/transcribe-youtube";
+import { isYouTubeUrl } from "@/lib/youtube";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -38,28 +33,26 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { buffer, filename, meta } = await downloadYouTubeAudio(url);
-    const { segments, language } = await transcribeAudio(
-      buffer,
-      filename,
-      speechmaticsKey,
-    );
+    const result = await transcribeYouTubeUrl(url, speechmaticsKey);
 
-    const plainText = segmentsToPlainText(segments);
+    if (result.mode === "complete") {
+      return NextResponse.json({
+        status: "done",
+        source: result.source,
+        url: result.url,
+        meta: result.meta,
+        segments: result.segments,
+        plainText: result.plainText,
+      });
+    }
 
     return NextResponse.json({
-      url,
-      meta: {
-        title: meta.title,
-        channel: meta.channel,
-        duration: formatDuration(meta.duration),
-        uploadDate: meta.uploadDate || undefined,
-        language,
-        thumbnail: meta.thumbnail,
-      },
-      segments,
-      plainText,
-    } satisfies import("@/lib/transcript").TranscribeResult);
+      status: "processing",
+      source: result.source,
+      jobId: result.jobId,
+      url: result.url,
+      meta: result.meta,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[transcribe]", message);

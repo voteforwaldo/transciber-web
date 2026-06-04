@@ -86,6 +86,17 @@ const COOKIES_SETUP_MSG =
   "\"Get cookies.txt LOCALLY\" on youtube.com, then pick the file from Downloads. " +
   "Or save as config/youtube-cookies.txt and run check-cookies.bat.";
 
+function ytdlpBaseArgs(): string[] {
+  return [
+    "--no-playlist",
+    "--no-warnings",
+    "--extractor-args",
+    "youtube:player_client=android,web;player_skip=webpage",
+    "--user-agent",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  ];
+}
+
 async function cookieArgs(): Promise<string[]> {
   const cookieFile = await resolveCookieFile();
   if (cookieFile) return ["--cookies", cookieFile];
@@ -149,6 +160,16 @@ function formatYtDlpError(detail: string, code: number): string {
     );
   }
   if (
+    lower.includes("no video formats found") ||
+    lower.includes("video unavailable") ||
+    lower.includes("private video")
+  ) {
+    const onVercel = process.env.VERCEL === "1";
+    return onVercel
+      ? "YouTube blocked or rejected this download on Vercel. Re-export cookies while logged into youtube.com, update YTDLP_COOKIES in Vercel settings, and redeploy. For reliable use, run run-local.bat on your PC."
+      : "YouTube blocked this download. Re-export cookies (install-cookies.bat) or try another video.";
+  }
+  if (
     (lower.includes("could not copy") && lower.includes("cookie")) ||
     lower.includes("failed to decrypt with dpapi")
   ) {
@@ -195,9 +216,9 @@ function parseMeta(json: YtDlpJson): VideoMeta {
 export async function fetchVideoMeta(url: string): Promise<VideoMeta> {
   const cookies = await cookieArgs();
   const out = await runYtDlp([
+    ...ytdlpBaseArgs(),
     "--no-download",
     "--print-json",
-    "--no-warnings",
     ...cookies,
     url,
   ]);
@@ -216,9 +237,9 @@ export async function downloadYouTubeAudio(
   try {
     const cookies = await cookieArgs();
     const metaOut = await runYtDlp([
+      ...ytdlpBaseArgs(),
       "--no-download",
       "--print-json",
-      "--no-warnings",
       ...cookies,
       url,
     ]);
@@ -227,10 +248,9 @@ export async function downloadYouTubeAudio(
 
     await runYtDlp(
       [
+        ...ytdlpBaseArgs(),
         "-f",
-        "ba[ext=m4a]/ba/b",
-        "--no-playlist",
-        "--no-warnings",
+        "bestaudio/best",
         "-o",
         outTemplate,
         ...cookies,

@@ -51,6 +51,31 @@ lib/              youtube (yt-dlp), speechmatics, gemini, setup
 config/           youtube-cookies.txt (local only, gitignored)
 ```
 
+## Use it online (YouTube links)
+
+| Host | YouTube paste link | Full Speechmatics + speakers |
+|------|-------------------|------------------------------|
+| **Vercel** ([transciber-web.vercel.app](https://transciber-web.vercel.app)) | Uses **YouTube captions** when the video has subtitles (CC). Fast, no laptop needed. | Only if download works (often blocked). Upload audio instead. |
+| **Render Docker** (recommended for full quality) | **yt-dlp** in container — same as your desktop tool. | Yes |
+
+### Quick: keep using Vercel
+
+Paste a link to a video that has **subtitles/CC turned on** on YouTube. The app fetches those captions automatically.
+
+### Full online tool (Render, ~5 min setup)
+
+1. Push this repo to GitHub.
+2. [render.com](https://render.com) → **New** → **Blueprint** → connect repo.
+3. Set env vars: `SPEECHMATICS_API_KEY`, `GEMINI_API_KEY`, `YTDLP_COOKIES` (Netscape cookies file text).
+4. Deploy. Open your `*.onrender.com` URL — paste any YouTube link.
+
+Or locally with Docker:
+
+```bash
+docker build -t transciber-web .
+docker run -p 3000:3000 --env-file .env.local -e YTDLP_COOKIES_FILE=/cookies.txt -v ./config/youtube-cookies.txt:/cookies.txt transciber-web
+```
+
 ## Deploy on Vercel
 
 The app can run on Vercel with a few constraints:

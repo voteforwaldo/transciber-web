@@ -3,6 +3,8 @@
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/deploy-vercel.ps1
 
 $ErrorActionPreference = "Stop"
+# Node writes TLS warnings to stderr; don't treat those as terminating errors.
+$PrevEap = $ErrorActionPreference
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
@@ -55,15 +57,28 @@ if ($vercelToken) {
     }
 }
 
+function Invoke-Vercel {
+    $ErrorActionPreference = "Continue"
+    & $VercelBin @tokenArg @args 2>&1 | ForEach-Object {
+        if ($_ -is [System.Management.Automation.ErrorRecord]) { Write-Host $_.ToString() }
+        else { Write-Host $_ }
+    }
+    return $LASTEXITCODE
+}
+
 Write-Host "Linking project (if needed)..."
-& $VercelBin @tokenArg link --yes 2>$null
+$scope = "svilen-s-projects"
+$scopeArg = @("--scope", $scope)
+
+$linkCode = Invoke-Vercel @scopeArg link --yes
+if ($linkCode -ne 0) { Write-Host "Link skipped or failed ($linkCode); continuing." }
 
 function Set-VercelEnv($name, $value, $envName) {
     if (-not $value) { return }
     Write-Host "Setting $name ($envName)..."
-    $value | & $VercelBin @tokenArg env add $name $envName --force 2>$null
+    $value | Invoke-Vercel @scopeArg env add $name $envName --force | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        $value | & $VercelBin @tokenArg env add $name $envName
+        $value | Invoke-Vercel @scopeArg env add $name $envName | Out-Null
     }
 }
 
@@ -75,5 +90,6 @@ foreach ($target in @("production", "preview", "development")) {
 }
 
 Write-Host "Deploying to production..."
-& $VercelBin @tokenArg deploy --prod --yes
+$deployCode = Invoke-Vercel @scopeArg deploy --prod --yes
+if ($deployCode -ne 0) { exit $deployCode }
 Write-Host "Done."

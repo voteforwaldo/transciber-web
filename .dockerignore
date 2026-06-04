@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.env*
+config/youtube-cookies.txt
+vendor
+*.md
+deploy-vercel.bat
+*.bat

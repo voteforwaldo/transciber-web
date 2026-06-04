@@ -1,0 +1,17 @@
+# Deploy on Render for full YouTube + Speechmatics (yt-dlp in Docker).
+# https://render.com — New → Blueprint → connect repo with this file.
+services:
+  - type: web
+    name: transciber-web
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/status
+    envVars:
+      - key: SPEECHMATICS_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: YTDLP_COOKIES
+        sync: false
+      - key: NODE_ENV
+        value: production

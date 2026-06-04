@@ -5,6 +5,12 @@
       "maxDuration": 300,
       "includeFiles": "vendor/yt-dlp"
     },
+    "app/api/transcribe/job/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/transcribe/upload/route.ts": {
+      "maxDuration": 120
+    },
     "app/api/summarize/route.ts": {
       "maxDuration": 120
     }

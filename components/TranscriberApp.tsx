@@ -35,6 +35,7 @@ function highlightText(text: string, query: string): React.ReactNode {
 
 export default function TranscriberApp() {
   const [url, setUrl] = useState("");
+  const [audioFile, setAudioFile] = useState<File | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -81,46 +82,139 @@ export default function TranscriberApp() {
     setPlainText("");
 
     const trimmed = url.trim();
-    if (!trimmed) {
-      setError("Paste a YouTube link first.");
+    if (!trimmed && !audioFile) {
+      setError("Paste a YouTube link or choose an audio file.");
       return;
     }
 
     setLoading(true);
-    setStatus("Downloading audio and transcribing… This may take several minutes.");
+    setStatus(audioFile ? "Uploading audio…" : "Downloading audio…");
 
     try {
-      const res = await fetch("/api/transcribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: trimmed }),
-      });
+      let res: Response;
+      if (audioFile) {
+        const form = new FormData();
+        form.append("file", audioFile);
+        form.append("title", audioFile.name);
+        res = await fetch("/api/transcribe/upload", { method: "POST", body: form });
+      } else {
+        res = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: trimmed }),
+        });
+      }
       const raw = await res.text();
-      let data: { error?: string; meta?: Meta; segments?: TranscriptSegment[]; plainText?: string };
+      let data: {
+        error?: string;
+        status?: string;
+        source?: string;
+        jobId?: string;
+        meta?: Meta;
+        segments?: TranscriptSegment[];
+        plainText?: string;
+        language?: string;
+      };
       try {
         data = raw ? JSON.parse(raw) : {};
       } catch {
+        if (res.status === 504 || res.status === 502) {
+          throw new Error(
+            "Server timed out (Vercel limit). Try a shorter video or use run-local.bat on your PC.",
+          );
+        }
         throw new Error(
           res.ok
             ? "Invalid response from server."
-            : `Server error (${res.status}). Check you opened the URL shown in the terminal (port 3010).`,
+            : `Server error (${res.status}). ${raw.slice(0, 200)}`,
         );
       }
       if (!res.ok) {
         throw new Error(data.error ?? `Transcription failed (${res.status}).`);
       }
+
+      if (data.status === "done" || (!data.jobId && data.segments)) {
+        setMeta(data.meta ?? null);
+        setSegments(data.segments ?? []);
+        setPlainText(data.plainText ?? "");
+        setStatus(
+          data.source === "youtube_captions"
+            ? "Done (YouTube captions — enable subtitles on the video for best results)."
+            : "Done.",
+        );
+        return;
+      }
+
+      const jobId = data.jobId;
+      if (!jobId) {
+        throw new Error("Server did not return a transcription job id.");
+      }
+
       setMeta(data.meta ?? null);
-      setSegments(data.segments ?? []);
-      setPlainText(data.plainText ?? "");
-      setStatus("Done.");
+      setStatus("Transcribing with Speechmatics…");
+
+      let polls = 0;
+      while (true) {
+        await new Promise((r) => setTimeout(r, 5000));
+        polls += 1;
+        let pollRes: Response;
+        try {
+          pollRes = await fetch(
+            `/api/transcribe/job?jobId=${encodeURIComponent(jobId)}`,
+          );
+        } catch {
+          throw new Error(
+            "Lost connection while waiting for transcription. The server may have timed out — try a shorter video or run locally.",
+          );
+        }
+        const pollRaw = await pollRes.text();
+        let pollData: {
+          error?: string;
+          status?: string;
+          speechmaticsStatus?: string;
+          segments?: TranscriptSegment[];
+          plainText?: string;
+          language?: string;
+        };
+        try {
+          pollData = pollRaw ? JSON.parse(pollRaw) : {};
+        } catch {
+          throw new Error(`Poll failed (${pollRes.status}). Try again.`);
+        }
+        if (!pollRes.ok) {
+          throw new Error(pollData.error ?? `Poll failed (${pollRes.status}).`);
+        }
+        if (pollData.status === "running") {
+          setStatus(
+            `Transcribing… (${pollData.speechmaticsStatus ?? "processing"}, check ${polls})`,
+          );
+          continue;
+        }
+        if (pollData.status === "done") {
+          setSegments(pollData.segments ?? []);
+          setPlainText(pollData.plainText ?? "");
+          if (pollData.language && data.meta) {
+            setMeta({ ...data.meta, language: pollData.language });
+          }
+          setStatus("Done.");
+          break;
+        }
+        throw new Error("Unexpected response from transcription service.");
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
+      if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        setError(
+          "Could not reach the server. If the video is long, Vercel may have timed out — try run-local.bat on your PC, or a shorter clip.",
+        );
+      } else {
+        setError(msg);
+      }
       setStatus("");
     } finally {
       setLoading(false);
     }
-  }, [url]);
+  }, [url, audioFile]);
 
   const onSummarize = useCallback(async () => {
     if (!plainText) return;
@@ -174,6 +268,25 @@ export default function TranscriberApp() {
           }}
           disabled={loading}
         />
+        <p className="hint" style={{ marginTop: "0.75rem" }}>
+          Or upload audio (mp3/m4a) if the video has no captions:
+        </p>
+        <input
+          type="file"
+          accept="audio/*,video/*,.m4a,.mp3,.mp4,.webm,.wav"
+          disabled={loading}
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            setAudioFile(f);
+            if (f) setUrl("");
+          }}
+        />
+        {audioFile ? (
+          <p className="hint">
+            Selected: <strong>{audioFile.name}</strong> (
+            {(audioFile.size / (1024 * 1024)).toFixed(1)} MB)
+          </p>
+        ) : null}
         <div className="row">
           <button type="button" onClick={onTranscribe} disabled={loading}>
             {loading ? "Working…" : "Transcribe"}
