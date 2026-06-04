@@ -64,10 +64,14 @@ Paste a link to a video that has **subtitles/CC turned on** on YouTube. The app 
 
 ### Full online tool (Render, ~5 min setup)
 
-1. Push this repo to GitHub.
-2. [render.com](https://render.com) → **New** → **Blueprint** → connect repo.
-3. Set env vars: `SPEECHMATICS_API_KEY`, `GEMINI_API_KEY`, `YTDLP_COOKIES` (Netscape cookies file text).
-4. Deploy. Open your `*.onrender.com` URL — paste any YouTube link.
+**Repo:** https://github.com/voteforwaldo/transciber-web
+
+1. Double-click **`setup-online.bat`** (opens Render deploy + links Vercel), or go to:  
+   [render.com/deploy?repo=https://github.com/voteforwaldo/transciber-web](https://render.com/deploy?repo=https://github.com/voteforwaldo/transciber-web)
+2. Sign in → **Apply** the blueprint.
+3. Set env vars when prompted: `SPEECHMATICS_API_KEY`, `GEMINI_API_KEY`, `YTDLP_COOKIES` (paste `config/youtube-cookies.txt`).
+4. When status is **Live**, paste your Render URL into `setup-online.bat` (or run `scripts/finish-render-setup.ps1`).
+5. Use **https://transciber-web.vercel.app** — YouTube links forward to Render automatically.
 
 Or locally with Docker:
 
