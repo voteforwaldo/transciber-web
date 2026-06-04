@@ -138,10 +138,21 @@ export default function SetupPanel({ onReady }: { onReady?: () => void }) {
   if (showYoutubeBackend) {
     return (
       <section className="card setup-panel">
-        <h2 className="section-title">Enable YouTube links (one-time)</h2>
+        <h2 className="section-title">Optional: any YouTube video (no CC required)</h2>
         <p className="hint">
-          Vercel cannot download most YouTube videos directly. Connect a free Render server
-          (same app, ~10 min) so paste-link works for any video.
+          <strong>Paste-link already works</strong> for videos with subtitles/CC (try{" "}
+          <a
+            href="https://www.youtube.com/watch?v=aircAruvnKk"
+            target="_blank"
+            rel="noreferrer"
+          >
+            this test video
+          </a>
+          ).
+        </p>
+        <p className="hint">
+          For videos <em>without</em> captions, connect a free Render server (~10 min) or upload
+          mp3/m4a:
         </p>
         <p className="hint">
           <a
@@ -152,9 +163,8 @@ export default function SetupPanel({ onReady }: { onReady?: () => void }) {
             Deploy on Render
           </a>
           {" · "}
-          then run <code>setup-online.bat</code> on your PC and paste your Render URL.
+          then run <code>setup-online.bat</code> and paste your Render URL.
         </p>
-        <p className="hint">Until then: upload an mp3/m4a file, or use videos with CC subtitles.</p>
       </section>
     );
   }

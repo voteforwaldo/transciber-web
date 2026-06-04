@@ -53,7 +53,7 @@ export async function getSetupStatus(): Promise<SetupStatus> {
 
   if (isVercel && !youtubeBackend) {
     hints.push(
-      "YouTube paste-link on Vercel needs Render: run setup-online.bat or set TRANSCRIBE_SERVICE_URL (see DEPLOY-RENDER.md). Upload audio still works.",
+      "Paste-link works for videos with subtitles/CC. For videos without captions, run setup-online.bat (Render) or upload audio — DEPLOY-RENDER.md.",
     );
   }
 

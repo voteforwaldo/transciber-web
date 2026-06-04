@@ -66,41 +66,53 @@ export async function fetchViaYoutubeTranscriptAi(
   const videoId = extractYouTubeVideoId(url);
   if (!videoId) return null;
 
-  const langs = ["en", ""];
-  for (const lang of langs) {
-    const apiUrl = lang
-      ? `${BASE}/${videoId}.txt?lang=${encodeURIComponent(lang)}`
-      : `${BASE}/${videoId}.txt`;
+  const langs = ["en", "a.en", ""];
+  const attempts = 3;
 
-    try {
-      const res = await fetch(apiUrl, {
-        headers: { "User-Agent": "TransciberWeb/1.0" },
-        signal: AbortSignal.timeout(25000),
-      });
-      if (!res.ok) continue;
+  for (let tryNum = 0; tryNum < attempts; tryNum++) {
+    if (tryNum > 0) {
+      await new Promise((r) => setTimeout(r, 400 * tryNum));
+    }
 
-      const body = await res.text();
-      if (!body.includes("## Transcript")) continue;
+    for (const lang of langs) {
+      const apiUrl = lang
+        ? `${BASE}/${videoId}.txt?lang=${encodeURIComponent(lang)}`
+        : `${BASE}/${videoId}.txt`;
 
-      const parsed = parseMarkdownTranscript(body);
-      if (!parsed) continue;
+      try {
+        const res = await fetch(apiUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (compatible; TransciberWeb/1.0; +https://transciber-web.vercel.app)",
+            Accept: "text/plain,text/markdown,*/*",
+          },
+          signal: AbortSignal.timeout(22000),
+        });
+        if (!res.ok) continue;
 
-      const meta: VideoMeta = {
-        title: parsed.title,
-        channel: "YouTube",
-        duration: parsed.durationSec,
-        uploadDate: "",
-        thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-      };
+        const body = await res.text();
+        if (!body.includes("## Transcript")) continue;
 
-      return {
-        meta: { ...meta, durationLabel: formatDuration(parsed.durationSec) },
-        segments: parsed.segments,
-        plainText: parsed.segments.map((s) => s.text).join(" "),
-        captionLanguage: lang || "en",
-      };
-    } catch (e) {
-      console.warn("[captions] youtube-transcript.ai:", e);
+        const parsed = parseMarkdownTranscript(body);
+        if (!parsed) continue;
+
+        const meta: VideoMeta = {
+          title: parsed.title,
+          channel: "YouTube",
+          duration: parsed.durationSec,
+          uploadDate: "",
+          thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        };
+
+        return {
+          meta: { ...meta, durationLabel: formatDuration(parsed.durationSec) },
+          segments: parsed.segments,
+          plainText: parsed.segments.map((s) => s.text).join(" "),
+          captionLanguage: lang || "en",
+        };
+      } catch (e) {
+        console.warn("[captions] youtube-transcript.ai:", e);
+      }
     }
   }
 

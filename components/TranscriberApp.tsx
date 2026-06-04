@@ -88,7 +88,9 @@ export default function TranscriberApp() {
     }
 
     setLoading(true);
-    setStatus(audioFile ? "Uploading audio…" : "Downloading audio…");
+    setStatus(
+      audioFile ? "Uploading audio…" : "Fetching YouTube transcript (usually a few seconds)…",
+    );
 
     try {
       let res: Response;
@@ -139,7 +141,7 @@ export default function TranscriberApp() {
         setPlainText(data.plainText ?? "");
         setStatus(
           data.source === "youtube_captions"
-            ? "Done (YouTube captions — enable subtitles on the video for best results)."
+            ? "Done — transcript from YouTube subtitles/CC."
             : "Done.",
         );
         return;

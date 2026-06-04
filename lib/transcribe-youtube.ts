@@ -35,9 +35,7 @@ export type TranscribeStartResponse =
       source: "youtube_captions";
     };
 
-function isVercel(): boolean {
-  return process.env.VERCEL === "1";
-}
+import { isVercel } from "@/lib/is-vercel";
 
 function metaFromDownload(meta: Awaited<ReturnType<typeof downloadYouTubeAudio>>["meta"]) {
   return {
@@ -104,13 +102,6 @@ export async function transcribeYouTubeUrl(
       };
     } catch (capErr) {
       console.warn("[transcribe] captions:", capErr);
-    }
-
-    try {
-      const { buffer, filename, meta } = await downloadYouTubeAudio(url);
-      return startSpeechmaticsJob(url, buffer, filename, meta, speechmaticsKey);
-    } catch (ytdlpErr) {
-      console.warn("[transcribe] yt-dlp:", ytdlpErr);
     }
 
     if (cobaltBase) {

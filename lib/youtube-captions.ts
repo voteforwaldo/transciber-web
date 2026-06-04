@@ -6,6 +6,7 @@ import { parseVttCaptions } from "@/lib/youtube-captions-parse";
 import { fetchPlayerWithCookies } from "@/lib/youtube-player-cookies";
 import { fetchViaYoutubeTranscriptLib } from "@/lib/youtube-transcript-lib";
 import { fetchViaYoutubeTranscriptAi } from "@/lib/youtube-transcript-ai";
+import { isVercel } from "@/lib/is-vercel";
 
 export function extractYouTubeVideoId(url: string): string | null {
   try {
@@ -251,18 +252,20 @@ export async function fetchYouTubeCaptions(url: string): Promise<YouTubeCaptions
     console.warn("[captions] youtube-transcript.ai:", e);
   }
 
-  try {
-    const lib = await fetchViaYoutubeTranscriptLib(url);
-    if (lib) {
-      const player = await fetchPlayerWithCookies(videoId).catch(() => null);
-      if (player?.videoDetails?.title) {
-        lib.meta.title = player.videoDetails.title;
-        lib.meta.channel = player.videoDetails.author ?? lib.meta.channel;
+  if (!isVercel()) {
+    try {
+      const lib = await fetchViaYoutubeTranscriptLib(url);
+      if (lib) {
+        const player = await fetchPlayerWithCookies(videoId).catch(() => null);
+        if (player?.videoDetails?.title) {
+          lib.meta.title = player.videoDetails.title;
+          lib.meta.channel = player.videoDetails.author ?? lib.meta.channel;
+        }
+        return lib;
       }
-      return lib;
+    } catch (e) {
+      console.warn("[captions] youtube-transcript:", e);
     }
-  } catch (e) {
-    console.warn("[captions] youtube-transcript:", e);
   }
 
   try {
@@ -274,21 +277,30 @@ export async function fetchYouTubeCaptions(url: string): Promise<YouTubeCaptions
     console.warn("[captions] cookie player:", e);
   }
 
-  try {
-    const inv = await fetchViaInvidious(videoId);    const player = await innertubePlayer(videoId).catch(() => null);
-    if (player?.videoDetails?.title) {
-      inv.meta.title = player.videoDetails.title;
-      inv.meta.channel = player.videoDetails.author ?? inv.meta.channel;
-      const d = Number(player.videoDetails.lengthSeconds ?? 0);
-      if (d > 0) {
-        inv.meta.duration = d;
-        inv.meta.durationLabel = formatDuration(d);
+  if (isVercel()) {
+    throw new Error(
+      "No subtitles/CC found for this video on the online service. Try a video with captions enabled, upload mp3/m4a, or run setup-online.bat for Render.",
+    );
+  }
+
+  if (!isVercel()) {
+    try {
+      const inv = await fetchViaInvidious(videoId);
+      const player = await innertubePlayer(videoId).catch(() => null);
+      if (player?.videoDetails?.title) {
+        inv.meta.title = player.videoDetails.title;
+        inv.meta.channel = player.videoDetails.author ?? inv.meta.channel;
+        const d = Number(player.videoDetails.lengthSeconds ?? 0);
+        if (d > 0) {
+          inv.meta.duration = d;
+          inv.meta.durationLabel = formatDuration(d);
+        }
+        inv.meta.thumbnail = player.videoDetails.thumbnail?.thumbnails?.at(-1)?.url;
       }
-      inv.meta.thumbnail = player.videoDetails.thumbnail?.thumbnails?.at(-1)?.url;
+      return inv;
+    } catch (invErr) {
+      console.warn("[captions] invidious:", invErr);
     }
-    return inv;
-  } catch (invErr) {
-    console.warn("[captions] invidious:", invErr);
   }
 
   const player = await innertubePlayer(videoId);
