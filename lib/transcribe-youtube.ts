@@ -1,6 +1,8 @@
+import { transcribeYouTubeViaGemini } from "@/lib/gemini-youtube";
 import { submitTranscriptionJob } from "@/lib/speechmatics";
 import { segmentsToPlainText } from "@/lib/transcript";
 import { transcribeViaRemoteService } from "@/lib/remote-transcribe";
+import { isVercel } from "@/lib/is-vercel";
 import { downloadYouTubeAudioViaCobalt } from "@/lib/youtube-cobalt";
 import { fetchYouTubeCaptions } from "@/lib/youtube-captions";
 import { downloadYouTubeAudio, formatDuration } from "@/lib/youtube";
@@ -32,10 +34,8 @@ export type TranscribeStartResponse =
       };
       segments: import("@/lib/speechmatics").TranscriptSegment[];
       plainText: string;
-      source: "youtube_captions";
+      source: "youtube_captions" | "gemini_youtube";
     };
-
-import { isVercel } from "@/lib/is-vercel";
 
 function metaFromDownload(meta: Awaited<ReturnType<typeof downloadYouTubeAudio>>["meta"]) {
   return {
@@ -104,6 +104,23 @@ export async function transcribeYouTubeUrl(
       console.warn("[transcribe] captions:", capErr);
     }
 
+    const geminiKey = process.env.GEMINI_API_KEY?.trim();
+    if (geminiKey) {
+      try {
+        const gem = await transcribeYouTubeViaGemini(url, geminiKey);
+        return {
+          mode: "complete",
+          url,
+          meta: gem.meta,
+          segments: gem.segments,
+          plainText: gem.plainText,
+          source: "gemini_youtube",
+        };
+      } catch (gemErr) {
+        console.warn("[transcribe] gemini-youtube:", gemErr);
+      }
+    }
+
     if (cobaltBase) {
       try {
         const { buffer, filename, meta } = await downloadYouTubeAudioViaCobalt(
@@ -117,9 +134,8 @@ export async function transcribeYouTubeUrl(
     }
 
     throw new Error(
-      "Could not get this video online (no captions found and YouTube download blocked on Vercel). " +
-        "Try: (1) a video with subtitles/CC enabled, (2) upload mp3/m4a, or (3) run setup-online.bat " +
-        "to connect Render for videos without captions — DEPLOY-RENDER.md.",
+      "Could not transcribe this video online. Tried captions and Gemini YouTube. " +
+        "Use a public video, upload mp3/m4a, or connect a home/Render backend (setup-online.bat).",
     );
   }
 
@@ -150,6 +166,23 @@ export async function transcribeYouTubeUrl(
     };
   } catch {
     /* fall through */
+  }
+
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  if (geminiKey) {
+    try {
+      const gem = await transcribeYouTubeViaGemini(url, geminiKey);
+      return {
+        mode: "complete",
+        url,
+        meta: gem.meta,
+        segments: gem.segments,
+        plainText: gem.plainText,
+        source: "gemini_youtube",
+      };
+    } catch (gemErr) {
+      console.warn("[transcribe] gemini-youtube:", gemErr);
+    }
   }
 
   if (cobaltBase) {

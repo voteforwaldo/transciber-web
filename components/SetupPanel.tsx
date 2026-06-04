@@ -140,19 +140,19 @@ export default function SetupPanel({ onReady }: { onReady?: () => void }) {
       <section className="card setup-panel">
         <h2 className="section-title">Optional: any YouTube video (no CC required)</h2>
         <p className="hint">
-          <strong>Paste-link already works</strong> for videos with subtitles/CC (try{" "}
+          <strong>Paste-link works online:</strong> videos with CC (free captions) or without CC
+          (Gemini YouTube — uses your <code>GEMINI_API_KEY</code>). Test:{" "}
           <a
             href="https://www.youtube.com/watch?v=aircAruvnKk"
             target="_blank"
             rel="noreferrer"
           >
-            this test video
+            sample video
           </a>
-          ).
+          .
         </p>
         <p className="hint">
-          For videos <em>without</em> captions, connect a free Render server (~10 min) or upload
-          mp3/m4a:
+          Optional: Render/home tunnel for Speechmatics on every video, or upload mp3/m4a:
         </p>
         <p className="hint">
           <a

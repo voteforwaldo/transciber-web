@@ -53,7 +53,7 @@ export async function getSetupStatus(): Promise<SetupStatus> {
 
   if (isVercel && !youtubeBackend) {
     hints.push(
-      "Paste-link works for videos with subtitles/CC. For videos without captions, run setup-online.bat (Render) or upload audio — DEPLOY-RENDER.md.",
+      "Paste-link: CC videos use free captions; no-CC videos use Gemini YouTube (your GEMINI_API_KEY). Or upload audio / setup-online.bat for Speechmatics.",
     );
   }
 

@@ -89,7 +89,9 @@ export default function TranscriberApp() {
 
     setLoading(true);
     setStatus(
-      audioFile ? "Uploading audio…" : "Fetching YouTube transcript (usually a few seconds)…",
+      audioFile
+        ? "Uploading audio…"
+        : "Fetching transcript (captions, then Gemini if needed — may take 1–3 min)…",
     );
 
     try {
@@ -142,7 +144,9 @@ export default function TranscriberApp() {
         setStatus(
           data.source === "youtube_captions"
             ? "Done — transcript from YouTube subtitles/CC."
-            : "Done.",
+            : data.source === "gemini_youtube"
+              ? "Done — transcript from Gemini (billed to your Gemini API)."
+              : "Done.",
         );
         return;
       }
