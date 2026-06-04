@@ -3,6 +3,8 @@ import type { VideoMeta } from "@/lib/youtube";
 import { formatDuration } from "@/lib/youtube";
 import { fetchCaptionsViaInvidious } from "@/lib/youtube-invidious";
 import { parseVttCaptions } from "@/lib/youtube-captions-parse";
+import { fetchPlayerWithCookies } from "@/lib/youtube-player-cookies";
+import { fetchViaYoutubeTranscriptLib } from "@/lib/youtube-transcript-lib";
 
 export function extractYouTubeVideoId(url: string): string | null {
   try {
@@ -163,15 +165,21 @@ async function fetchCaptionSegments(track: CaptionTrack): Promise<TranscriptSegm
   const base = track.baseUrl;
   if (!base) throw new Error("No caption track URL.");
 
+  const { youtubeCookieHeader } = await import("@/lib/youtube-cookie-header");
+  const cookie = await youtubeCookieHeader();
+  const headers: Record<string, string> = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  };
+  if (cookie) headers.Cookie = cookie;
+
   const jsonUrl = `${base}${base.includes("?") ? "&" : "?"}fmt=json3`;
-  const jsonRes = await fetch(jsonUrl, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-  });
+  const jsonRes = await fetch(jsonUrl, { headers });
   if (jsonRes.ok) {
     return parseJson3Captions(await jsonRes.text());
   }
 
-  const vttRes = await fetch(base, { headers: { "User-Agent": "Mozilla/5.0" } });
+  const vttRes = await fetch(base, { headers });
   if (!vttRes.ok) {
     throw new Error(`Caption download failed (${vttRes.status}).`);
   }
@@ -201,13 +209,65 @@ async function fetchViaInvidious(videoId: string): Promise<YouTubeCaptionsResult
   };
 }
 
+async function captionsFromPlayer(
+  player: Awaited<ReturnType<typeof fetchPlayerWithCookies>>,
+): Promise<YouTubeCaptionsResult | null> {
+  if (!player) return null;
+  const tracks =
+    player.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  const track = pickCaptionTrack(tracks);
+  if (!track?.baseUrl) return null;
+
+  const segments = await fetchCaptionSegments(track);
+  if (!segments.length) return null;
+
+  const vd = player.videoDetails;
+  const durationSec = Number(vd?.lengthSeconds ?? 0);
+  const meta: VideoMeta = {
+    title: vd?.title ?? "YouTube video",
+    channel: vd?.author ?? "Unknown",
+    duration: durationSec,
+    uploadDate: "",
+    thumbnail: vd?.thumbnail?.thumbnails?.at(-1)?.url,
+  };
+
+  return {
+    meta: { ...meta, durationLabel: formatDuration(durationSec) },
+    segments,
+    plainText: segments.map((s) => s.text).join(" "),
+    captionLanguage: track.languageCode,
+  };
+}
+
 export async function fetchYouTubeCaptions(url: string): Promise<YouTubeCaptionsResult> {
   const videoId = extractYouTubeVideoId(url);
   if (!videoId) throw new Error("Could not parse YouTube video ID.");
 
   try {
-    const inv = await fetchViaInvidious(videoId);
-    const player = await innertubePlayer(videoId).catch(() => null);
+    const lib = await fetchViaYoutubeTranscriptLib(url);
+    if (lib) {
+      const player = await fetchPlayerWithCookies(videoId).catch(() => null);
+      if (player?.videoDetails?.title) {
+        lib.meta.title = player.videoDetails.title;
+        lib.meta.channel = player.videoDetails.author ?? lib.meta.channel;
+      }
+      return lib;
+    }
+  } catch (e) {
+    console.warn("[captions] youtube-transcript:", e);
+  }
+
+  try {
+    const withCookies = await captionsFromPlayer(
+      await fetchPlayerWithCookies(videoId),
+    );
+    if (withCookies) return withCookies;
+  } catch (e) {
+    console.warn("[captions] cookie player:", e);
+  }
+
+  try {
+    const inv = await fetchViaInvidious(videoId);    const player = await innertubePlayer(videoId).catch(() => null);
     if (player?.videoDetails?.title) {
       inv.meta.title = player.videoDetails.title;
       inv.meta.channel = player.videoDetails.author ?? inv.meta.channel;

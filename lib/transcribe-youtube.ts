@@ -83,6 +83,7 @@ export async function transcribeYouTubeUrl(
       }
     }
 
+    // Captions first on Vercel (yt-dlp is usually blocked)
     try {
       const cap = await fetchYouTubeCaptions(url);
       return {
@@ -125,9 +126,8 @@ export async function transcribeYouTubeUrl(
     }
 
     throw new Error(
-      "This video could not be transcribed on Vercel (YouTube blocks cloud downloads). " +
-        "Try a video with subtitles/CC enabled, upload an audio file, or set TRANSCRIBE_SERVICE_URL " +
-        "to a Render Docker deploy — see DEPLOY-RENDER.md.",
+      "Could not get this video online. Try: (1) a video with subtitles/CC turned on in YouTube, " +
+        "(2) upload an mp3/m4a file, or (3) run setup-online.bat to connect Render for any video — DEPLOY-RENDER.md.",
     );
   }
 
