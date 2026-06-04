@@ -1,0 +1,41 @@
+================================================================================
+  REQUIRED: config/youtube-cookies.txt  (Option A works on Windows — use this)
+================================================================================
+
+OPTION A — Chrome extension (recommended; Chrome can stay open)
+-------------------------------------------------------------
+Automatic export (Option B) often fails on Windows with "Failed to decrypt with
+DPAPI". Use this method instead.
+
+1. Open Chrome Web Store and search:
+     Get cookies.txt LOCALLY
+   Install the extension (by a developer named "lately" or similar).
+
+2. In Chrome, go to:  https://www.youtube.com
+   Make sure you are logged into your Google account.
+
+3. Click the extension icon (puzzle piece -> Get cookies.txt LOCALLY).
+
+4. Export cookies for youtube.com (or "current site").
+
+5. The extension saves to your Downloads folder (any name is OK).
+
+6. Double-click install-cookies.bat in the project folder.
+   Pick the file you just exported (usually #1 = newest).
+   It copies to config\youtube-cookies.txt automatically.
+
+   OR save manually to:
+     C:\Users\oprik\Projects\transciber-web\config\youtube-cookies.txt
+
+7. check-cookies.bat should say OK.
+
+7. Restart run-local.bat, open http://localhost:3010, transcribe.
+
+
+OPTION B — yt-dlp automatic export (often fails on Windows — skip if you saw DPAPI)
+---------------------------------------------------------------------------------
+Only if Option A is impossible. Chrome must be fully closed (Task Manager).
+
+  export-cookies.bat kill
+
+If you see "Failed to decrypt with DPAPI", use Option A.

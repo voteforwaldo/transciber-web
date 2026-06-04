@@ -1,0 +1,12 @@
+{
+  "framework": "nextjs",
+  "functions": {
+    "app/api/transcribe/route.ts": {
+      "maxDuration": 300,
+      "includeFiles": "vendor/yt-dlp"
+    },
+    "app/api/summarize/route.ts": {
+      "maxDuration": 120
+    }
+  }
+}
