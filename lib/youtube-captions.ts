@@ -5,6 +5,7 @@ import { fetchCaptionsViaInvidious } from "@/lib/youtube-invidious";
 import { parseVttCaptions } from "@/lib/youtube-captions-parse";
 import { fetchPlayerWithCookies } from "@/lib/youtube-player-cookies";
 import { fetchViaYoutubeTranscriptLib } from "@/lib/youtube-transcript-lib";
+import { fetchViaYoutubeTranscriptAi } from "@/lib/youtube-transcript-ai";
 
 export function extractYouTubeVideoId(url: string): string | null {
   try {
@@ -242,6 +243,13 @@ async function captionsFromPlayer(
 export async function fetchYouTubeCaptions(url: string): Promise<YouTubeCaptionsResult> {
   const videoId = extractYouTubeVideoId(url);
   if (!videoId) throw new Error("Could not parse YouTube video ID.");
+
+  try {
+    const relay = await fetchViaYoutubeTranscriptAi(url);
+    if (relay) return relay;
+  } catch (e) {
+    console.warn("[captions] youtube-transcript.ai:", e);
+  }
 
   try {
     const lib = await fetchViaYoutubeTranscriptLib(url);

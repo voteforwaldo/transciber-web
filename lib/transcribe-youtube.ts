@@ -126,8 +126,9 @@ export async function transcribeYouTubeUrl(
     }
 
     throw new Error(
-      "Could not get this video online. Try: (1) a video with subtitles/CC turned on in YouTube, " +
-        "(2) upload an mp3/m4a file, or (3) run setup-online.bat to connect Render for any video — DEPLOY-RENDER.md.",
+      "Could not get this video online (no captions found and YouTube download blocked on Vercel). " +
+        "Try: (1) a video with subtitles/CC enabled, (2) upload mp3/m4a, or (3) run setup-online.bat " +
+        "to connect Render for videos without captions — DEPLOY-RENDER.md.",
     );
   }
 
