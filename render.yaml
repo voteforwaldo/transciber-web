@@ -1,10 +1,11 @@
 # Deploy on Render for full YouTube + Speechmatics (yt-dlp in Docker).
-# https://render.com — New → Blueprint → connect repo with this file.
+# One-click: https://render.com/deploy?repo=https://github.com/voteforwaldo/transciber-web
 services:
   - type: web
     name: transciber-web
     runtime: docker
     plan: free
+    branch: master
     healthCheckPath: /api/status
     envVars:
       - key: SPEECHMATICS_API_KEY
